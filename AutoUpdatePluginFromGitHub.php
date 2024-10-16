@@ -63,10 +63,10 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			$this->update_path     = esc_url( $update_path );
 			$this->plugin_slug     = $plugin_slug;
 
-			list ( $t1, $t2 ) = explode( '/', $plugin_slug );
-			$this->slug = str_replace( '.php', '', $t2 );
+			list ( $t1, $t2 )       = explode( '/', $plugin_slug );
+			$this->slug             = str_replace( '.php', '', $t2 );
 			$this->plugin_directory = $t1;
-			
+
 			// Define the alternative API for updating checking.
 			add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_update' ) );
 			add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_plugin' ), 10, 2 );
@@ -75,7 +75,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 		}
 
 		public function is_plugin_active() {
-			if ( ! function_exists( 'is_plugin_active' ) && ! file_exists( ABSPATH . 'wp-admin/includes/plugin.php' ) ) {	
+			if ( ! function_exists( 'is_plugin_active' ) && ! file_exists( ABSPATH . 'wp-admin/includes/plugin.php' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/plugin.php';
 			}
 			return function_exists( 'is_plugin_active' ) ? is_plugin_active( $this->plugin_slug ) : false;
@@ -83,35 +83,36 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 
 		public function after_install( $response, $hook_extra, $result ) {
 			error_log( 'AutoUpdatePluginFromGitHub: result ' . json_encode( $result ) );
-			error_log( 'AutoUpdatePluginFromGitHub: response ' . json_encode( $response ) );
-			if ( ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
+			if ( empty( $result['destination_name'] ) || empty( $result['destination'] ) || ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
 				error_log( 'AutoUpdatePluginFromGitHub: Plugin not correctly installed' );
 				return $result;
 			}
 
 			global $wp_filesystem;
 
-			require_once ( ABSPATH . '/wp-admin/includes/file.php' );
+			require_once ABSPATH . '/wp-admin/includes/file.php';
 			WP_Filesystem();
 
 			if ( empty( $wp_filesystem ) ) {
 				error_log( 'AutoUpdatePluginFromGitHub: file system not available' );
 				return $result;
 			}
-	
+
 			$plugin_folder = trailingslashit( WP_PLUGIN_DIR ) . $this->plugin_directory;
-	
+			error_log( 'AutoUpdatePluginFromGitHub: plugin_folder ' . $plugin_folder );
 			// Check if the extracted folder ends with -main, -master, or a version number
-			if ( $result['destination'] === $this->plugin_directory . '-main' || $result['destination'] === $this->plugin_directory . '-master' ) {
+			if ( $result['destination_name'] === $this->plugin_directory . '-main' || $result['destination_name'] === $this->plugin_directory . '-master' ) {
 				error_log( 'AutoUpdatePluginFromGitHub: trying to move' );
 				// If the target folder already exists, remove it
-				if ($wp_filesystem->exists($plugin_folder)) {
-					$wp_filesystem->delete($plugin_folder, true, 'd' );
+				if ( $wp_filesystem->exists( $plugin_folder ) ) {
+					$wp_filesystem->delete( $plugin_folder, true, 'd' );
 				}
-	
+
 				// Rename the extracted folder to the correct plugin folder name
-				$wp_filesystem->move( trailingslashit( WP_PLUGIN_DIR ) . $result['destination'], $plugin_folder );
-				$result['destination'] = $this->plugin_directory;
+				$wp_filesystem->move( $result['destination'], $plugin_folder );
+				$result['destination_name']   = $this->plugin_directory;
+				$result['destination']        = $plugin_folder;
+				$result['remote_destination'] = $plugin_folder;
 				// Ensure the plugin is active if it was active before the update
 				if ( function_exists( 'activate_plugin' ) ) {
 					$activate_result = activate_plugin( $this->plugin_slug );
@@ -122,15 +123,15 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			} else {
 				error_log( 'AutoUpdatePluginFromGitHub: destination not correct' );
 			}
-	
+
 			return $result;
 		}
-	
+
 
 		public function force_update_check() {
 			if ( ! empty( $_GET['iwp_check_plugin_update'] ) ) {
 				wp_clean_plugins_cache();
-            	wp_update_plugins();
+				wp_update_plugins();
 			}
 		}
 
@@ -148,10 +149,10 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			$remote_version = $this->get_remote_version();
 
 			if ( $remote_version && version_compare( $this->current_version, $remote_version, '<' ) ) {
-				$update = $this->get_update_data( $remote_version );
+				$update                                    = $this->get_update_data( $remote_version );
 				$transient->response[ $this->plugin_slug ] = (object) $update;
 			} else {
-				$item = $this->get_mock_update_data();
+				$item                                       = $this->get_mock_update_data();
 				$transient->no_update[ $this->plugin_slug ] = (object) $item;
 			}
 
@@ -209,7 +210,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 		 * @return string $remote_version Remote plugin version.
 		 */
 		public function get_remote_version() {
-			$request = wp_remote_get( $this->update_path . '/raw/main/'. esc_attr( $this->slug ) .'.php' );
+			$request = wp_remote_get( $this->update_path . '/raw/main/' . esc_attr( $this->slug ) . '.php' );
 			if ( ! is_wp_error( $request ) || wp_remote_retrieve_response_code( $request ) === 200 ) {
 				$request = wp_remote_retrieve_body( $request );
 
