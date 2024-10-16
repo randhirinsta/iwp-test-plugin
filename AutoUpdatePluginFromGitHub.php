@@ -109,7 +109,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 				'plugin'        => $this->plugin_slug,
 				'new_version'   => $new_version,
 				'url'           => $this->update_path,
-				'package'       => esc_url( $this->update_path . '/archive/refs/heads/'. $this->slug .'.zip' ),
+				'package'       => $this->update_path . '/archive/refs/heads/main.zip',
 				'icons'         => array(),
 				'banners'       => array(),
 				'banners_rtl'   => array(),
