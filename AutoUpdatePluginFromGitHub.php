@@ -82,7 +82,10 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 		}
 
 		public function after_install( $response, $hook_extra, $result ) {
+			error_log( 'AutoUpdatePluginFromGitHub: result ' . json_encode( $result ) );
+			error_log( 'AutoUpdatePluginFromGitHub: response ' . json_encode( $response ) );
 			if ( ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
+				error_log( 'AutoUpdatePluginFromGitHub: Plugin not correctly installed' );
 				return $result;
 			}
 
@@ -92,6 +95,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			WP_Filesystem();
 
 			if ( empty( $wp_filesystem ) ) {
+				error_log( 'AutoUpdatePluginFromGitHub: file system not available' );
 				return $result;
 			}
 	
@@ -99,7 +103,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 	
 			// Check if the extracted folder ends with -main, -master, or a version number
 			if ( $result['destination'] === $this->plugin_directory . '-main' || $result['destination'] === $this->plugin_directory . '-master' ) {
-	
+				error_log( 'AutoUpdatePluginFromGitHub: trying to move' );
 				// If the target folder already exists, remove it
 				if ($wp_filesystem->exists($plugin_folder)) {
 					$wp_filesystem->delete($plugin_folder, true, 'd' );
@@ -115,6 +119,8 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 						error_log( 'Error activating plugin: ' . $activate_result->get_error_message() );
 					}
 				}
+			} else {
+				error_log( 'AutoUpdatePluginFromGitHub: destination not correct' );
 			}
 	
 			return $result;
