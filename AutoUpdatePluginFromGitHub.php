@@ -63,17 +63,25 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			$this->update_path     = esc_url( $update_path );
 			$this->plugin_slug     = $plugin_slug;
 
-			list ( $t1, $t2 )       = explode( '/', $plugin_slug );
-			$this->slug             = str_replace( '.php', '', $t2 );
-			$this->plugin_directory = $t1;
+			$plugin_slug            = explode( '/', $plugin_slug );
+			$this->slug             = str_replace( '.php', '', $plugin_slug[1] );
+			$this->plugin_directory = $plugin_slug[0];
 
-			// Define the alternative API for updating checking.
+			// Hooks for the plugin update.
 			add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_update' ) );
+			// Hook for the auto update.
 			add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_plugin' ), 10, 2 );
+			// Hook for the force update check.
 			add_action( 'admin_init', array( $this, 'force_update_check' ) );
+			// Hook for the after install.
 			add_filter( 'upgrader_post_install', array( $this, 'after_install' ), 10, 3 );
 		}
 
+		/**
+		 * Check if the plugin is active.
+		 *
+		 * @return boolean Whether the plugin is active.
+		 */
 		public function is_plugin_active() {
 			if ( ! function_exists( 'is_plugin_active' ) && ! file_exists( ABSPATH . 'wp-admin/includes/plugin.php' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -81,6 +89,15 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			return function_exists( 'is_plugin_active' ) ? is_plugin_active( $this->plugin_slug ) : false;
 		}
 
+		/**
+		 * After install plugin. Correct the folder name and activate the plugin.
+		 *
+		 * @param object $response The response object.
+		 * @param array  $hook_extra The hook extra.
+		 * @param array  $result The result.
+		 *
+		 * @return array The result.
+		 */
 		public function after_install( $response, $hook_extra, $result ) {
 			// Check if the extracted folder ends with -main, or -master.
 			if ( empty( $result['destination_name'] ) || empty( $result['destination'] ) || ( $result['destination_name'] !== $this->plugin_directory . '-main' && $result['destination_name'] !== $this->plugin_directory . '-master' ) || ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
@@ -90,6 +107,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			try {
 				global $wp_filesystem;
 
+				// Initialize the file system.
 				require_once ABSPATH . '/wp-admin/includes/file.php';
 				WP_Filesystem();
 
@@ -98,6 +116,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 					return $result;
 				}
 
+				// Get the plugin folder.
 				$plugin_folder = trailingslashit( WP_PLUGIN_DIR ) . $this->plugin_directory;
 
 				// If the target folder already exists, remove it
@@ -124,7 +143,11 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			return $result;
 		}
 
-
+		/**
+		 * Force update check.
+		 *
+		 * @return void
+		 */
 		public function force_update_check() {
 			if ( ! empty( $_GET['iwp_check_plugin_update'] ) && function_exists( 'wp_clean_plugins_cache' ) && function_exists( 'wp_update_plugins' ) ) {
 				wp_clean_plugins_cache();
@@ -143,8 +166,10 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 				return $transient;
 			}
 
+			// Get the remote version.
 			$remote_version = $this->get_remote_version();
 
+			// If the remote version is greater than the current version, add the update to the transient.
 			if ( $remote_version && version_compare( $this->current_version, $remote_version, '<' ) ) {
 				$update                                    = $this->get_update_data( $remote_version );
 				$transient->response[ $this->plugin_slug ] = (object) $update;
