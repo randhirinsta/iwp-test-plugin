@@ -82,27 +82,24 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 		}
 
 		public function after_install( $response, $hook_extra, $result ) {
-			error_log( 'AutoUpdatePluginFromGitHub: result ' . json_encode( $result ) );
-			if ( empty( $result['destination_name'] ) || empty( $result['destination'] ) || ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
-				error_log( 'AutoUpdatePluginFromGitHub: Plugin not correctly installed' );
+			// Check if the extracted folder ends with -main, or -master.
+			if ( empty( $result['destination_name'] ) || empty( $result['destination'] ) || ( $result['destination_name'] !== $this->plugin_directory . '-main' && $result['destination_name'] !== $this->plugin_directory . '-master' ) || ! defined( 'WP_PLUGIN_DIR' ) || ! file_exists( ABSPATH . '/wp-admin/includes/file.php' ) || ! $this->is_plugin_active() ) {
 				return $result;
 			}
 
-			global $wp_filesystem;
+			try {
+				global $wp_filesystem;
 
-			require_once ABSPATH . '/wp-admin/includes/file.php';
-			WP_Filesystem();
+				require_once ABSPATH . '/wp-admin/includes/file.php';
+				WP_Filesystem();
 
-			if ( empty( $wp_filesystem ) ) {
-				error_log( 'AutoUpdatePluginFromGitHub: file system not available' );
-				return $result;
-			}
+				if ( empty( $wp_filesystem ) ) {
+					error_log( 'Update plugin: file system not available' );
+					return $result;
+				}
 
-			$plugin_folder = trailingslashit( WP_PLUGIN_DIR ) . $this->plugin_directory;
-			error_log( 'AutoUpdatePluginFromGitHub: plugin_folder ' . $plugin_folder );
-			// Check if the extracted folder ends with -main, -master, or a version number
-			if ( $result['destination_name'] === $this->plugin_directory . '-main' || $result['destination_name'] === $this->plugin_directory . '-master' ) {
-				error_log( 'AutoUpdatePluginFromGitHub: trying to move' );
+				$plugin_folder = trailingslashit( WP_PLUGIN_DIR ) . $this->plugin_directory;
+
 				// If the target folder already exists, remove it
 				if ( $wp_filesystem->exists( $plugin_folder ) ) {
 					$wp_filesystem->delete( $plugin_folder, true, 'd' );
@@ -120,8 +117,8 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 						error_log( 'Error activating plugin: ' . $activate_result->get_error_message() );
 					}
 				}
-			} else {
-				error_log( 'AutoUpdatePluginFromGitHub: destination not correct' );
+			} catch ( \Exception $e ) {
+				error_log( 'AutoUpdatePluginFromGitHub: Exception ' . $e->getMessage() );
 			}
 
 			return $result;
@@ -129,7 +126,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 
 
 		public function force_update_check() {
-			if ( ! empty( $_GET['iwp_check_plugin_update'] ) ) {
+			if ( ! empty( $_GET['iwp_check_plugin_update'] ) && function_exists( 'wp_clean_plugins_cache' ) && function_exists( 'wp_update_plugins' ) ) {
 				wp_clean_plugins_cache();
 				wp_update_plugins();
 			}
