@@ -61,6 +61,15 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 
 			// Define the alternative API for updating checking.
 			add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_update' ) );
+			add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_plugin' ), 10, 2 );
+			add_action( 'admin_init', array( $this, 'force_update_check' ) );
+		}
+
+		public function force_update_check() {
+			if ( ! empty( $_GET['iwp_check_plugin_update'] ) ) {
+				wp_clean_plugins_cache();
+            	wp_update_plugins();
+			}
 		}
 
 		/**
@@ -100,7 +109,7 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 				'plugin'        => $this->plugin_slug,
 				'new_version'   => $new_version,
 				'url'           => $this->update_path,
-				'package'       => $this->update_path . '/archive/refs/heads/main.zip',
+				'package'       => esc_url( $this->update_path . '/archive/refs/heads/'. $this->slug .'.zip' ),
 				'icons'         => array(),
 				'banners'       => array(),
 				'banners_rtl'   => array(),
@@ -149,6 +158,22 @@ if ( ! class_exists( 'AutoUpdatePluginFromGitHub' ) ) {
 			}
 
 			return false;
+		}
+
+		/**
+		 * Auto update specific plugin.
+		 *
+		 * @param boolean $update   Whether to auto update.
+		 * @param object  $item     Plugin update data.
+		 *
+		 * @return boolean $update Whether to auto update.
+		 */
+		public function auto_update_specific_plugin( $update, $item ) {
+			if ( $this->slug === $item->slug ) {
+				return true;
+			} else {
+				return $update;
+			}
 		}
 	}
 }
